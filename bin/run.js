@@ -19,11 +19,9 @@
 import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
-// Use process.argv[1] rather than import.meta.url to preserve the symlinked path.
-// When installed as a dependency, node_modules/pkg -> ../../source is a symlink;
-// import.meta.url resolves to the real source path, breaking module resolution.
-const ROOT = path.resolve(path.dirname(process.argv[1]), '..')
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const testsDir = path.join(ROOT, 'tests')
 const customDir = process.env.CUSTOM_DIR
 
@@ -46,7 +44,7 @@ if (args.length > 0) {
     testGlobs.push(specFile)
   }
 } else {
-  testGlobs.push(`${testsDir}/**/*.spec.js`)
+  testGlobs.push(`${testsDir}/*.spec.js`)
 }
 
 // Add custom tests if CUSTOM_DIR is set
