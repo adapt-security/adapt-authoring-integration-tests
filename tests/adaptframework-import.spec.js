@@ -51,22 +51,52 @@ describe('AdaptFramework import', () => {
 
     it('should have created content objects', async () => {
       const items = await content.find({ _courseId: summary.courseId, _type: { $in: ['page', 'menu'] } })
-      assert.ok(items.length > 0, 'should have at least one content object')
+      assert.equal(items.length, 5, 'should have 5 content objects')
+      for (const item of items) {
+        assert.ok(item.title, `${item._type} "${item._id}" should have a title`)
+        assert.ok(item._parentId, `${item._type} "${item._id}" should have a _parentId`)
+        assert.ok(typeof item._sortOrder === 'number', `${item._type} "${item._id}" should have a numeric _sortOrder`)
+      }
     })
 
     it('should have created articles', async () => {
       const items = await content.find({ _courseId: summary.courseId, _type: 'article' })
-      assert.ok(items.length > 0, 'should have at least one article')
+      assert.equal(items.length, 5, 'should have 5 articles')
+      const pageIds = new Set(
+        (await content.find({ _courseId: summary.courseId, _type: { $in: ['page', 'menu'] } }))
+          .map(p => p._id.toString())
+      )
+      for (const item of items) {
+        assert.ok(item.title, `article "${item._id}" should have a title`)
+        assert.ok(pageIds.has(item._parentId?.toString()), `article "${item._id}" should have a content object as parent`)
+      }
     })
 
     it('should have created blocks', async () => {
       const items = await content.find({ _courseId: summary.courseId, _type: 'block' })
-      assert.ok(items.length > 0, 'should have at least one block')
+      assert.equal(items.length, 23, 'should have 23 blocks')
+      const articleIds = new Set(
+        (await content.find({ _courseId: summary.courseId, _type: 'article' }))
+          .map(a => a._id.toString())
+      )
+      for (const item of items) {
+        assert.ok(item.title, `block "${item._id}" should have a title`)
+        assert.ok(articleIds.has(item._parentId?.toString()), `block "${item._id}" should have an article as parent`)
+      }
     })
 
     it('should have created components', async () => {
       const items = await content.find({ _courseId: summary.courseId, _type: 'component' })
-      assert.ok(items.length > 0, 'should have at least one component')
+      assert.equal(items.length, 23, 'should have 23 components')
+      const blockIds = new Set(
+        (await content.find({ _courseId: summary.courseId, _type: 'block' }))
+          .map(b => b._id.toString())
+      )
+      for (const item of items) {
+        assert.ok(item._component, `component "${item._id}" should have a _component type`)
+        assert.ok(item._layout, `component "${item._id}" should have a _layout`)
+        assert.ok(blockIds.has(item._parentId?.toString()), `component "${item._id}" should have a block as parent`)
+      }
     })
 
     it('should have valid parent-child relationships', async () => {
@@ -85,7 +115,12 @@ describe('AdaptFramework import', () => {
 
     it('should report content counts in summary', async () => {
       assert.ok(summary.content, 'summary should include content counts')
-      assert.ok(summary.content.course > 0, 'should count course')
+      assert.equal(summary.content.course, 1, 'should count 1 course')
+      assert.equal(summary.content.config, 1, 'should count 1 config')
+      assert.equal(summary.content.page, 5, 'should count 5 pages')
+      assert.equal(summary.content.article, 5, 'should count 5 articles')
+      assert.equal(summary.content.block, 23, 'should count 23 blocks')
+      assert.equal(summary.content.component, 23, 'should count 23 components')
     })
 
     it('should report plugin versions in summary', async () => {
@@ -93,6 +128,8 @@ describe('AdaptFramework import', () => {
       assert.ok(summary.versions.length > 0, 'should have at least one version entry')
       const fw = summary.versions.find(v => v.name === 'adapt_framework')
       assert.ok(fw, 'should include adapt_framework version')
+      assert.ok(Array.isArray(fw.versions), 'version entry should have versions array')
+      assert.equal(fw.versions.length, 2, 'version entry should have installed and import versions')
     })
   })
 
