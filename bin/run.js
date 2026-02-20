@@ -12,8 +12,8 @@
  *   CUSTOM_DIR=/path/to/custom npx at-integration-test
  *
  * Environment variables:
- *   FIXTURES_DIR  - Override the default fixtures directory
- *   CUSTOM_DIR    - Path to a directory containing custom fixtures/ and tests/
+ *   CUSTOM_DIR - Path to a directory containing additional fixtures/ and/or tests/
+ *                Custom fixtures override built-in fixtures when keys collide.
  */
 
 import { execSync } from 'child_process'
@@ -25,11 +25,6 @@ import { fileURLToPath } from 'url'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const testsDir = path.join(ROOT, 'tests')
 const customDir = process.env.CUSTOM_DIR
-
-// Resolve fixtures directory
-if (!process.env.FIXTURES_DIR) {
-  process.env.FIXTURES_DIR = path.join(ROOT, 'fixtures')
-}
 
 // Collect test file paths
 const testFiles = []
@@ -52,17 +47,10 @@ if (args.length > 0) {
 // Add custom tests if CUSTOM_DIR is set
 if (customDir) {
   const customTestsDir = path.join(customDir, 'tests')
-  const customFixturesDir = path.join(customDir, 'fixtures')
-
   if (fs.existsSync(customTestsDir)) {
     const customFiles = fs.readdirSync(customTestsDir).filter(f => f.endsWith('.spec.js')).sort()
     testFiles.push(...customFiles.map(f => path.join(customTestsDir, f)))
     console.log(`Including custom tests from ${customTestsDir}`)
-  }
-
-  if (fs.existsSync(path.join(customFixturesDir, 'manifest.json'))) {
-    process.env.CUSTOM_FIXTURES_DIR = customFixturesDir
-    console.log(`Including custom fixtures from ${customFixturesDir}`)
   }
 }
 
@@ -74,7 +62,6 @@ fs.writeFileSync(entryFile, imports + '\n')
 const cmd = `node --test --test-force-exit '${entryFile}'`
 
 console.log(`Tests: ${testFiles.map(f => path.basename(f)).join(', ')}`)
-console.log(`Fixtures: ${process.env.FIXTURES_DIR}`)
 if (customDir) console.log(`Custom: ${customDir}`)
 console.log()
 
