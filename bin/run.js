@@ -18,6 +18,7 @@
 
 import { execSync } from 'child_process'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -30,8 +31,8 @@ if (!process.env.FIXTURES_DIR) {
   process.env.FIXTURES_DIR = path.join(ROOT, 'fixtures')
 }
 
-// Build list of test file paths
-const testGlobs = []
+// Collect test file paths
+const testFiles = []
 const args = process.argv.slice(2)
 
 if (args.length > 0) {
@@ -41,10 +42,11 @@ if (args.length > 0) {
       console.error(`Test not found: ${name} (expected ${specFile})`)
       process.exit(1)
     }
-    testGlobs.push(specFile)
+    testFiles.push(specFile)
   }
 } else {
-  testGlobs.push(`${testsDir}/*.spec.js`)
+  const files = fs.readdirSync(testsDir).filter(f => f.endsWith('.spec.js')).sort()
+  testFiles.push(...files.map(f => path.join(testsDir, f)))
 }
 
 // Add custom tests if CUSTOM_DIR is set
@@ -53,27 +55,31 @@ if (customDir) {
   const customFixturesDir = path.join(customDir, 'fixtures')
 
   if (fs.existsSync(customTestsDir)) {
-    testGlobs.push(`${customTestsDir}/**/*.spec.js`)
+    const customFiles = fs.readdirSync(customTestsDir).filter(f => f.endsWith('.spec.js')).sort()
+    testFiles.push(...customFiles.map(f => path.join(customTestsDir, f)))
     console.log(`Including custom tests from ${customTestsDir}`)
   }
 
-  // Merge custom fixtures manifest into the main one if it exists
   if (fs.existsSync(path.join(customFixturesDir, 'manifest.json'))) {
     process.env.CUSTOM_FIXTURES_DIR = customFixturesDir
     console.log(`Including custom fixtures from ${customFixturesDir}`)
   }
 }
 
-const testArgs = testGlobs.map(g => `'${g}'`).join(' ')
-const cmd = `node --test --test-force-exit --test-concurrency=1 ${testArgs}`
+// Generate a single entry file that imports all specs so the app boots once
+const imports = testFiles.map(f => `import '${f}'`).join('\n')
+const entryFile = path.join(os.tmpdir(), `aat-test-entry-${Date.now()}.js`)
+fs.writeFileSync(entryFile, imports + '\n')
 
-console.log(`Running: ${cmd}`)
+const cmd = `node --test --test-force-exit '${entryFile}'`
+
+console.log(`Tests: ${testFiles.map(f => path.basename(f)).join(', ')}`)
 console.log(`Fixtures: ${process.env.FIXTURES_DIR}`)
 if (customDir) console.log(`Custom: ${customDir}`)
 console.log()
 
 try {
   execSync(cmd, { stdio: 'inherit', env: process.env })
-} catch {
-  process.exit(1)
+} finally {
+  try { fs.unlinkSync(entryFile) } catch {}
 }
