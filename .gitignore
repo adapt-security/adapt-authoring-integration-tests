@@ -1,0 +1,4 @@
+node_modules
+APP_DATA
+fixtures/*.zip
+fixtures/manifest.json

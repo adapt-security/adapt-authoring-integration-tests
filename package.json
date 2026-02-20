@@ -1,0 +1,15 @@
+{
+  "name": "adapt-authoring-integration-tests",
+  "version": "0.0.1",
+  "description": "Integration test suite for the Adapt authoring tool",
+  "license": "GPL-3.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'tests/**/*.spec.js'",
+    "test:import": "node --test tests/adaptframework-import.spec.js",
+    "test:build": "node --test tests/adaptframework-build.spec.js"
+  },
+  "engines": {
+    "node": "24"
+  }
+}
