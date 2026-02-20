@@ -6,34 +6,23 @@ Integration test suite for the Adapt authoring tool. Tests the full application 
 
 - Node.js 24+
 - MongoDB 8.0+
-- A running instance of the adapt-authoring app (dependencies installed)
+- The adapt-authoring app with dependencies installed
 
 ## Setup
 
-No fixtures are included by default. You must provide your own:
-
-1. Copy `fixtures/manifest.example.json` to `fixtures/manifest.json`
-2. Place your fixture files (e.g. a course export zip) in the `fixtures/` directory
-3. Update `manifest.json` to list your fixtures
+Create a fixtures directory with a `manifest.json` and your test fixture files:
 
 ```bash
-cp fixtures/manifest.example.json fixtures/manifest.json
-cp /path/to/your-course-export.zip fixtures/course-export.zip
+mkdir /path/to/fixtures
+echo '{ "course-export": "course-export.zip" }' > /path/to/fixtures/manifest.json
+cp /path/to/your-course-export.zip /path/to/fixtures/course-export.zip
 ```
 
-The manifest maps logical names to files:
-
-```json
-{
-  "course-export": "course-export.zip"
-}
-```
-
-Tests reference fixtures by name, so the same tests work with any content as long as the manifest has the expected keys.
+See `fixtures/manifest.example.json` for the expected format.
 
 ## Running tests
 
-From the **adapt-authoring app directory** (where `node_modules` and the full app are installed):
+From the **adapt-authoring app directory**:
 
 ```bash
 # Set required environment variables
@@ -45,37 +34,40 @@ export ADAPT_AUTHORING_SERVER__url='http://localhost:5678'
 export ADAPT_AUTHORING_SESSIONS__secret='testsessionssecret'
 
 # Run all integration tests
-node --test '../integration-tests/tests/**/*.spec.js'
+FIXTURES_DIR=/path/to/fixtures npx at-integration-test
 
-# Run a specific test file
-node --test ../integration-tests/tests/adaptframework-import.spec.js
+# Run only import tests
+FIXTURES_DIR=/path/to/fixtures npx at-integration-test --import-only
+
+# Run only build tests
+FIXTURES_DIR=/path/to/fixtures npx at-integration-test --build-only
 ```
 
-## Custom fixtures (e.g. client testing)
+## Custom tests (e.g. client testing)
 
-Override the fixtures directory with the `FIXTURES_DIR` environment variable to test with different content:
+Point `CUSTOM_DIR` to a directory containing custom `fixtures/` and `tests/`:
+
+```
+my-client-tests/
+  fixtures/
+    manifest.json
+    client-course.zip
+  tests/
+    client-specific.spec.js
+```
 
 ```bash
-# Create a directory with client fixtures
-mkdir /path/to/client-fixtures
-cp client-course.zip /path/to/client-fixtures/course-export.zip
-
-# Create a manifest
-echo '{ "course-export": "course-export.zip" }' > /path/to/client-fixtures/manifest.json
-
-# Run tests with custom fixtures
-FIXTURES_DIR=/path/to/client-fixtures node --test '../integration-tests/tests/**/*.spec.js'
+CUSTOM_DIR=/path/to/my-client-tests npx at-integration-test
 ```
 
-This allows testing client-specific content on production servers without modifying the test repo.
+Custom fixtures are merged with the standard fixtures (custom takes priority on key collisions). Custom tests are run alongside the standard tests.
 
 ## CI
 
 The GitHub Actions workflow runs weekly and can be triggered manually via `workflow_dispatch`. It:
 
 1. Checks out both this repo and the main adapt-authoring repo
-2. Starts MongoDB via `supercharge/mongodb-github-action`
-3. Installs app dependencies
-4. Runs all integration tests
-
-For CI, fixtures are downloaded from a separate test fixtures repository.
+2. Downloads test fixtures from a separate repository
+3. Starts MongoDB via `supercharge/mongodb-github-action`
+4. Installs app dependencies
+5. Runs all integration tests

@@ -5,10 +5,8 @@
   "repository": "adapt-security/adapt-authoring-integration-tests",
   "license": "GPL-3.0",
   "type": "module",
-  "scripts": {
-    "test": "node --test 'tests/**/*.spec.js'",
-    "test:import": "node --test tests/adaptframework-import.spec.js",
-    "test:build": "node --test tests/adaptframework-build.spec.js"
+  "bin": {
+    "at-integration-test": "./bin/run.js"
   },
   "engines": {
     "node": "24"
