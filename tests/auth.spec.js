@@ -24,7 +24,7 @@ describe('Authentication system', () => {
   })
 
   after(async () => {
-    await cleanDb(['users', 'authtokens', 'passwordresets', 'roles'])
+    await cleanDb(['users', 'authtokens', 'passwordresets'])
   })
 
   describe('User Registration', () => {
