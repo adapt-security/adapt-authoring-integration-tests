@@ -6,10 +6,10 @@
  * Must be run from the adapt-authoring app directory (where node_modules are installed).
  *
  * Usage:
- *   node /path/to/integration-tests/bin/run.js
- *   node /path/to/integration-tests/bin/run.js --import-only
- *   node /path/to/integration-tests/bin/run.js --build-only
- *   CUSTOM_DIR=/path/to/custom node /path/to/integration-tests/bin/run.js
+ *   npx at-integration-test                    # run all tests
+ *   npx at-integration-test auth               # run auth.spec.js
+ *   npx at-integration-test mongodb content    # run mongodb.spec.js and content.spec.js
+ *   CUSTOM_DIR=/path/to/custom npx at-integration-test
  *
  * Environment variables:
  *   FIXTURES_DIR  - Override the default fixtures directory
@@ -32,18 +32,19 @@ if (!process.env.FIXTURES_DIR) {
   process.env.FIXTURES_DIR = path.join(ROOT, 'fixtures')
 }
 
-// Build list of test file globs
+// Build list of test file paths
 const testGlobs = []
-
-// Parse arguments
 const args = process.argv.slice(2)
-const importOnly = args.includes('--import-only')
-const buildOnly = args.includes('--build-only')
 
-if (importOnly) {
-  testGlobs.push(path.join(testsDir, 'adaptframework-import.spec.js'))
-} else if (buildOnly) {
-  testGlobs.push(path.join(testsDir, 'adaptframework-build.spec.js'))
+if (args.length > 0) {
+  for (const name of args) {
+    const specFile = path.join(testsDir, `${name}.spec.js`)
+    if (!fs.existsSync(specFile)) {
+      console.error(`Test not found: ${name} (expected ${specFile})`)
+      process.exit(1)
+    }
+    testGlobs.push(specFile)
+  }
 } else {
   testGlobs.push(`${testsDir}/**/*.spec.js`)
 }
