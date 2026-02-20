@@ -51,7 +51,7 @@ describe('AdaptFramework build', () => {
       const [record] = await mongodb.find('adaptbuilds', { _id: buildResult.buildData._id })
       assert.ok(record, 'build record should exist in database')
       assert.equal(record.action, 'export')
-      assert.equal(record.courseId, courseId)
+      assert.equal(record.courseId.toString(), courseId)
     })
 
     it('should have created an output file', async () => {
