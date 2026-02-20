@@ -3,15 +3,25 @@ import assert from 'node:assert/strict'
 import { getApp, getModule, cleanDb } from '../lib/app.js'
 
 let content
+let authLocal
+let createdBy
 
 describe('Content CRUD operations', () => {
   before(async () => {
     await getApp()
     content = await getModule('content')
+    authLocal = await getModule('auth-local')
+    const user = await authLocal.register({
+      email: 'content-test@example.com',
+      firstName: 'Content',
+      lastName: 'Tester',
+      password: 'Password123!'
+    })
+    createdBy = user._id.toString()
   })
 
   after(async () => {
-    await cleanDb(['content'])
+    await cleanDb(['content', 'users', 'authtokens'])
   })
 
   // ---------------------------------------------------------------------------
@@ -22,7 +32,7 @@ describe('Content CRUD operations', () => {
 
     it('should insert a course content item', async () => {
       course = await content.insert(
-        { _type: 'course', title: 'Test Course' },
+        { _type: 'course', title: 'Test Course', createdBy },
         { validate: false, schemaName: 'course' }
       )
       assert.ok(course, 'insert should return a document')
@@ -56,19 +66,19 @@ describe('Content CRUD operations', () => {
 
     before(async () => {
       course = await content.insert(
-        { _type: 'course', title: 'Hierarchy Course' },
+        { _type: 'course', title: 'Hierarchy Course', createdBy },
         { validate: false, schemaName: 'course' }
       )
       page = await content.insert(
-        { _type: 'page', title: 'Test Page', _parentId: course._id.toString(), _courseId: course._id.toString() },
+        { _type: 'page', title: 'Test Page', _parentId: course._id.toString(), _courseId: course._id.toString(), createdBy },
         { validate: false, schemaName: 'contentobject' }
       )
       article = await content.insert(
-        { _type: 'article', title: 'Test Article', _parentId: page._id.toString(), _courseId: course._id.toString() },
+        { _type: 'article', title: 'Test Article', _parentId: page._id.toString(), _courseId: course._id.toString(), createdBy },
         { validate: false, schemaName: 'article' }
       )
       block = await content.insert(
-        { _type: 'block', title: 'Test Block', _parentId: article._id.toString(), _courseId: course._id.toString() },
+        { _type: 'block', title: 'Test Block', _parentId: article._id.toString(), _courseId: course._id.toString(), createdBy },
         { validate: false, schemaName: 'block' }
       )
     })
@@ -100,20 +110,20 @@ describe('Content CRUD operations', () => {
 
     before(async () => {
       const course = await content.insert(
-        { _type: 'course', title: 'Query Course' },
+        { _type: 'course', title: 'Query Course', createdBy },
         { validate: false, schemaName: 'course' }
       )
       courseId = course._id.toString()
       await content.insert(
-        { _type: 'page', title: 'Page A', _parentId: courseId, _courseId: courseId },
+        { _type: 'page', title: 'Page A', _parentId: courseId, _courseId: courseId, createdBy },
         { validate: false, schemaName: 'contentobject' }
       )
       await content.insert(
-        { _type: 'page', title: 'Page B', _parentId: courseId, _courseId: courseId },
+        { _type: 'page', title: 'Page B', _parentId: courseId, _courseId: courseId, createdBy },
         { validate: false, schemaName: 'contentobject' }
       )
       await content.insert(
-        { _type: 'article', title: 'Article A', _parentId: courseId, _courseId: courseId },
+        { _type: 'article', title: 'Article A', _parentId: courseId, _courseId: courseId, createdBy },
         { validate: false, schemaName: 'article' }
       )
     })
@@ -136,7 +146,7 @@ describe('Content CRUD operations', () => {
   describe('Content update', () => {
     it('should update a content item title', async () => {
       const course = await content.insert(
-        { _type: 'course', title: 'Original Title' },
+        { _type: 'course', title: 'Original Title', createdBy },
         { validate: false, schemaName: 'course' }
       )
       const updated = await content.update(
@@ -155,7 +165,7 @@ describe('Content CRUD operations', () => {
   describe('Content deletion', () => {
     it('should delete a content item and verify removal', async () => {
       const course = await content.insert(
-        { _type: 'course', title: 'To Be Deleted' },
+        { _type: 'course', title: 'To Be Deleted', createdBy },
         { validate: false, schemaName: 'course' }
       )
       const courseId = course._id.toString()

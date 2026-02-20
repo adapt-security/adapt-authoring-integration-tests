@@ -51,7 +51,7 @@ describe('MongoDB core operations', () => {
       const inserted = await mongodb.insert(COLLECTION, { name: 'Eve', score: 50 })
       docId = inserted._id
 
-      await mongodb.update(COLLECTION, { _id: docId }, { score: 99 })
+      await mongodb.update(COLLECTION, { _id: docId }, { $set: { score: 99 } })
 
       const [updated] = await mongodb.find(COLLECTION, { _id: docId })
       assert.equal(updated.score, 99, 'score should be updated to 99')
