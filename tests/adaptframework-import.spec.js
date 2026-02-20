@@ -5,14 +5,12 @@ import { getFixture } from '../lib/fixtures.js'
 
 let framework
 let content
-let fixturePath
 
 describe('AdaptFramework import', () => {
   before(async () => {
     await getApp()
     framework = await getModule('adaptframework')
     content = await getModule('content')
-    fixturePath = await getFixture('course-export')
   })
 
   after(async () => {
@@ -24,7 +22,7 @@ describe('AdaptFramework import', () => {
 
     it('should import a course zip without errors', async () => {
       const importer = await framework.importCourse({
-        importPath: fixturePath,
+        importPath: await getFixture('course-export'),
         userId: '000000000000000000000000',
         tags: [],
         importContent: true,
@@ -109,7 +107,7 @@ describe('AdaptFramework import', () => {
 
     it('should create a separate course on re-import', async () => {
       const importer = await framework.importCourse({
-        importPath: fixturePath,
+        importPath: await getFixture('course-export'),
         userId: '000000000000000000000000',
         tags: [],
         importContent: true,
@@ -139,7 +137,7 @@ describe('AdaptFramework import', () => {
 
     it('should not create content when isDryRun is true', async () => {
       const importer = await framework.importCourse({
-        importPath: fixturePath,
+        importPath: await getFixture('course-export'),
         userId: '000000000000000000000000',
         tags: [],
         isDryRun: true,
