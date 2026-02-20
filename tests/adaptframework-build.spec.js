@@ -21,9 +21,10 @@ describe('AdaptFramework build', () => {
       userId: '000000000000000000000000',
       tags: [],
       importContent: true,
-      importPlugins: false,
+      importPlugins: true,
       migrateContent: true,
-      updatePlugins: false
+      updatePlugins: false,
+      removeSource: false
     })
     courseId = importer.summary.courseId.toString()
   })

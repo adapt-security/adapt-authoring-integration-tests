@@ -28,9 +28,10 @@ describe('AdaptFramework import', () => {
         userId: '000000000000000000000000',
         tags: [],
         importContent: true,
-        importPlugins: false,
+        importPlugins: true,
         migrateContent: true,
-        updatePlugins: false
+        updatePlugins: false,
+        removeSource: false
       })
       summary = importer.summary
       assert.ok(summary, 'import should return a summary')
@@ -112,9 +113,10 @@ describe('AdaptFramework import', () => {
         userId: '000000000000000000000000',
         tags: [],
         importContent: true,
-        importPlugins: false,
+        importPlugins: true,
         migrateContent: true,
-        updatePlugins: false
+        updatePlugins: false,
+        removeSource: false
       })
       secondCourseId = importer.summary.courseId.toString()
       assert.ok(secondCourseId, 'should have a courseId')
@@ -142,9 +144,10 @@ describe('AdaptFramework import', () => {
         tags: [],
         isDryRun: true,
         importContent: true,
-        importPlugins: false,
+        importPlugins: true,
         migrateContent: true,
-        updatePlugins: false
+        updatePlugins: false,
+        removeSource: false
       })
       assert.ok(importer.summary, 'should still return a summary')
 

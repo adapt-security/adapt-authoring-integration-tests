@@ -63,7 +63,7 @@ if (customDir) {
 }
 
 const testArgs = testGlobs.map(g => `'${g}'`).join(' ')
-const cmd = `node --test --test-force-exit ${testArgs}`
+const cmd = `node --test --test-force-exit --test-concurrency=1 ${testArgs}`
 
 console.log(`Running: ${cmd}`)
 console.log(`Fixtures: ${process.env.FIXTURES_DIR}`)
