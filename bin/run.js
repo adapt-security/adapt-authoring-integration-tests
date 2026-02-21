@@ -21,6 +21,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { dropTestDb } from '../lib/db.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const testsDir = path.join(ROOT, 'tests')
@@ -53,6 +54,11 @@ if (customDir) {
     console.log(`Including custom tests from ${customTestsDir}`)
   }
 }
+
+// Drop the test database to ensure a clean state before the app boots.
+// Stale records (e.g. contentplugins from a previous run) can cause
+// initPlugins to look for plugin files that no longer exist.
+await dropTestDb()
 
 // Generate a single entry file that imports all specs so the app boots once
 const imports = testFiles.map(f => `import '${f}'`).join('\n')
