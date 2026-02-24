@@ -26,6 +26,8 @@ import { dropTestDb } from '../lib/db.js'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const testsDir = path.join(ROOT, 'tests')
 const customDir = process.env.CUSTOM_DIR
+  ? path.isAbsolute(process.env.CUSTOM_DIR) ? process.env.CUSTOM_DIR : path.resolve(process.env.CUSTOM_DIR)
+  : undefined
 
 // Collect test file paths
 const testFiles = []
@@ -68,7 +70,7 @@ fs.writeFileSync(entryFile, imports + '\n')
 
 const cmd = `node --test --test-force-exit '${entryFile}'`
 
-console.log(`Tests: ${testFiles.map(f => path.basename(f)).join(', ')}`)
+console.log(`Tests:\n${testFiles.map(f => `  ${path.basename(f)}`).join('\n')}`)
 if (customTestFiles.length) {
   console.log(`Custom scripts:\n${customTestFiles.map(f => `  ${path.basename(f)}`).join('\n')}`)
 }
