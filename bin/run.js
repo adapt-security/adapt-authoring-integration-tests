@@ -46,12 +46,13 @@ if (args.length > 0) {
 }
 
 // Add custom tests if CUSTOM_DIR is set
+const customTestFiles = []
 if (customDir) {
   const customTestsDir = path.join(customDir, 'tests')
   if (fs.existsSync(customTestsDir)) {
     const customFiles = fs.readdirSync(customTestsDir).filter(f => f.endsWith('.spec.js')).sort()
-    testFiles.push(...customFiles.map(f => path.join(customTestsDir, f)))
-    console.log(`Including custom tests from ${customTestsDir}`)
+    customTestFiles.push(...customFiles.map(f => path.join(customTestsDir, f)))
+    testFiles.push(...customTestFiles)
   }
 }
 
@@ -68,7 +69,9 @@ fs.writeFileSync(entryFile, imports + '\n')
 const cmd = `node --test --test-force-exit '${entryFile}'`
 
 console.log(`Tests: ${testFiles.map(f => path.basename(f)).join(', ')}`)
-if (customDir) console.log(`Custom: ${customDir}`)
+if (customTestFiles.length) {
+  console.log(`Custom scripts:\n${customTestFiles.map(f => `  ${path.basename(f)}`).join('\n')}`)
+}
 console.log()
 
 try {
