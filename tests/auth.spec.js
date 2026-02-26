@@ -267,4 +267,40 @@ describe('Authentication system', () => {
       assert.equal(dbUser.isTempLocked, false, 'isTempLocked should be false after re-enable')
     })
   })
+
+  describe('Route configuration', () => {
+    it('should have type set to local', () => {
+      assert.equal(authLocal.type, 'local')
+    })
+
+    it('should have a router with routes', () => {
+      assert.ok(authLocal.router, 'should have a router')
+      assert.ok(Array.isArray(authLocal.router.routes), 'router should have routes array')
+      assert.ok(authLocal.router.routes.length > 0, 'router should have at least one route')
+    })
+
+    it('should have default auth routes on the router', () => {
+      const routePaths = authLocal.router.routes.map(r => r.route)
+      for (const expected of ['/', '/register', '/enable', '/disable']) {
+        assert.ok(routePaths.includes(expected), `should have default route ${expected}`)
+      }
+    })
+
+    it('should have the login route unsecured', () => {
+      const loginRoute = `${authLocal.router.path}/`
+      assert.ok(
+        auth.unsecuredRoutes.post[loginRoute],
+        `POST ${loginRoute} should be unsecured`
+      )
+    })
+
+    it('should have the registration route secured', () => {
+      const registerRoute = `${authLocal.router.path}/register`
+      assert.equal(
+        auth.unsecuredRoutes.post[registerRoute],
+        undefined,
+        `POST ${registerRoute} should not be in unsecured routes`
+      )
+    })
+  })
 })
