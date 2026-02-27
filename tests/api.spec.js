@@ -18,12 +18,13 @@ describe('API endpoint availability', () => {
   })
 
   it('should respond to every registered route (not 404)', async () => {
-    const baseUrl = `http://${server.url}`
+    const url = server.url.startsWith('http') ? server.url : `http://${server.url}`
+    const baseUrl = url.replace(/\/$/, '')
     const failures = []
 
     for (const [path, methods] of routeMap) {
-      // Replace Express-style :params with a dummy ObjectId
-      const resolvedPath = path.replace(/:[^/]+/g, '000000000000000000000000')
+      // Replace :param and {param} style placeholders with a dummy ObjectId
+      const resolvedPath = path.replace(/[{]?:[^/}]+[}]?/g, '000000000000000000000000')
 
       for (const method of methods) {
         const url = `${baseUrl}${resolvedPath}`
