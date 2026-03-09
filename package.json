@@ -1,6 +1,6 @@
 {
   "name": "adapt-authoring-integration-tests",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Integration test suite for the Adapt authoring tool",
   "repository": "github:adapt-security/adapt-authoring-integration-tests",
   "license": "GPL-3.0",
