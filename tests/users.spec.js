@@ -91,7 +91,7 @@ describe('Users module', () => {
   })
 
   describe('User deletion', () => {
-    let deleteEmail = 'delete-me@example.com'
+    const deleteEmail = 'delete-me@example.com'
 
     it('should create a user to be deleted', async () => {
       const user = await authLocal.register({

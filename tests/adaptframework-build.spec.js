@@ -5,14 +5,13 @@ import { getApp, getModule, cleanDb } from '../lib/app.js'
 import { getFixture } from '../lib/fixtures.js'
 
 let framework
-let content
 let courseId
 
 describe('AdaptFramework build', () => {
   before(async () => {
     await getApp()
     framework = await getModule('adaptframework')
-    content = await getModule('content')
+    await getModule('content')
 
     // Import a course to use as build input
     const fixturePath = await getFixture('course-export')

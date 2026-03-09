@@ -3,14 +3,12 @@ import assert from 'node:assert/strict'
 import { getApp, getModule } from '../lib/app.js'
 
 let roles
-let mongodb
 const createdRoleIds = []
 
 describe('Roles', () => {
   before(async () => {
     await getApp()
     roles = await getModule('roles')
-    mongodb = await getModule('mongodb')
   })
 
   after(async () => {
