@@ -6,6 +6,36 @@ let content
 let authLocal
 let createdBy
 
+// ---------------------------------------------------------------------------
+// Helper: build a course with a full content hierarchy for testing
+// ---------------------------------------------------------------------------
+async function createCourseHierarchy (opts = {}) {
+  const v = false
+  const cid = (id) => id.toString()
+  const course = await content.insert(
+    { _type: 'course', title: opts.title || 'Test Course', createdBy },
+    { validate: v, schemaName: 'course' }
+  )
+  const courseId = cid(course._id)
+  const config = await content.insert(
+    { _type: 'config', _courseId: courseId, createdBy, _enabledPlugins: [], _menu: '', _theme: '' },
+    { validate: v, schemaName: 'config' }
+  )
+  const page = await content.insert(
+    { _type: 'page', title: 'Page', _parentId: courseId, _courseId: courseId, createdBy },
+    { validate: v, schemaName: 'contentobject' }
+  )
+  const article = await content.insert(
+    { _type: 'article', title: 'Article', _parentId: cid(page._id), _courseId: courseId, createdBy },
+    { validate: v, schemaName: 'article' }
+  )
+  const block = await content.insert(
+    { _type: 'block', title: 'Block', _parentId: cid(article._id), _courseId: courseId, createdBy },
+    { validate: v, schemaName: 'block' }
+  )
+  return { course, config, page, article, block, courseId }
+}
+
 describe('Content CRUD operations', () => {
   before(async () => {
     await getApp()
@@ -174,6 +204,108 @@ describe('Content CRUD operations', () => {
 
       const results = await content.find({ _id: courseId })
       assert.equal(results.length, 0, 'deleted course should not be found')
+    })
+
+    it('should delete all descendants when deleting a parent', async () => {
+      const { course, page, article, block, courseId } = await createCourseHierarchy()
+
+      await content.delete({ _id: page._id })
+
+      const remaining = await content.find({ _courseId: courseId })
+      const remainingIds = remaining.map(r => r._id.toString())
+      assert.ok(!remainingIds.includes(page._id.toString()), 'page should be deleted')
+      assert.ok(!remainingIds.includes(article._id.toString()), 'article should be deleted')
+      assert.ok(!remainingIds.includes(block._id.toString()), 'block should be deleted')
+      assert.ok(remainingIds.includes(course._id.toString()), 'course should remain')
+    })
+
+    it('should include config when deleting a course', async () => {
+      const { course, courseId } = await createCourseHierarchy()
+
+      await content.delete({ _id: course._id })
+
+      const remaining = await content.find({ _courseId: courseId })
+      assert.equal(remaining.length, 0, 'all content including config should be deleted')
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Clone
+  // ---------------------------------------------------------------------------
+  describe('Clone', () => {
+    it('should recursively clone a subtree', async () => {
+      const { page, courseId } = await createCourseHierarchy()
+
+      const cloned = await content.clone(createdBy, page._id, page._parentId)
+
+      assert.ok(cloned._id.toString() !== page._id.toString(), 'clone should have a new _id')
+      assert.equal(cloned._type, 'page')
+      assert.equal(cloned._courseId.toString(), courseId)
+
+      // descendants should also be cloned
+      const clonedChildren = await content.find({ _parentId: cloned._id })
+      assert.equal(clonedChildren.length, 1, 'cloned page should have 1 article child')
+      assert.equal(clonedChildren[0]._type, 'article')
+
+      const clonedBlocks = await content.find({ _parentId: clonedChildren[0]._id })
+      assert.equal(clonedBlocks.length, 1, 'cloned article should have 1 block child')
+      assert.equal(clonedBlocks[0]._type, 'block')
+    })
+
+    it('should clone a full course with config', async () => {
+      const { course } = await createCourseHierarchy()
+
+      const clonedCourse = await content.clone(createdBy, course._id)
+
+      assert.ok(clonedCourse._id.toString() !== course._id.toString())
+      assert.equal(clonedCourse._type, 'course')
+
+      const clonedItems = await content.find({ _courseId: clonedCourse._id })
+      const types = clonedItems.map(i => i._type)
+      assert.ok(types.includes('config'), 'cloned course should have a config')
+      assert.ok(types.includes('page'), 'cloned course should have a page')
+      assert.ok(types.includes('article'), 'cloned course should have an article')
+      assert.ok(types.includes('block'), 'cloned course should have a block')
+    })
+
+    it('should set createdBy on cloned items', async () => {
+      const { page, courseId } = await createCourseHierarchy()
+
+      const cloned = await content.clone(createdBy, page._id, page._parentId)
+
+      const clonedItems = await content.find({ _courseId: courseId, _parentId: cloned._id })
+      for (const item of clonedItems) {
+        assert.equal(item.createdBy.toString(), createdBy)
+      }
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Sort order
+  // ---------------------------------------------------------------------------
+  describe('Sort order', () => {
+    it('should assign _sortOrder to siblings on insert', async () => {
+      const { page, courseId } = await createCourseHierarchy()
+      const pageId = page._id.toString()
+
+      await content.insert(
+        { _type: 'article', title: 'A1', _parentId: pageId, _courseId: courseId, createdBy },
+        { validate: false, schemaName: 'article' }
+      )
+      await content.insert(
+        { _type: 'article', title: 'A2', _parentId: pageId, _courseId: courseId, createdBy },
+        { validate: false, schemaName: 'article' }
+      )
+
+      const articles = await content.find(
+        { _parentId: pageId, _type: 'article' },
+        {},
+        { sort: { _sortOrder: 1 } }
+      )
+      assert.ok(articles.length >= 2, 'should have at least 2 articles')
+      for (let i = 0; i < articles.length; i++) {
+        assert.equal(articles[i]._sortOrder, i + 1, `article ${i} should have _sortOrder ${i + 1}`)
+      }
     })
   })
 })
