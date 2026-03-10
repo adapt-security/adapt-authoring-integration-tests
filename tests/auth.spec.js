@@ -505,6 +505,35 @@ describe('Authentication system', () => {
     })
   })
 
+  describe('Sensitive field protection', () => {
+    it('should mark password as isInternal in the localauthuser schema', async () => {
+      const jsonschema = await getModule('jsonschema')
+      const schema = await jsonschema.getSchema('localauthuser')
+      const passwordDef = schema.built.properties.password
+      assert.ok(passwordDef, 'password property should exist in the schema')
+      assert.equal(passwordDef.isInternal, true, 'password should be marked as isInternal to prevent API exposure')
+    })
+
+    it('should strip isInternal fields when sanitising user data', async () => {
+      const [authorRole] = await roles.find({ shortName: 'contentcreator' })
+      const user = await authLocal.register({
+        email: 'sanitise-test@example.com',
+        firstName: 'Sanitise',
+        lastName: 'Test',
+        password: testPassword,
+        roles: [authorRole._id.toString()]
+      })
+      // Fetch the raw record (includes password)
+      const [rawUser] = await mongodb.find('users', { _id: user._id })
+      assert.ok(rawUser.password, 'raw DB record should have password')
+
+      // Sanitise using the same method AbstractApiModule uses for HTTP responses
+      const sanitised = await users.sanitise('localauthuser', rawUser, { isInternal: true, strict: false })
+      assert.equal(sanitised.password, undefined, 'password should be stripped after sanitisation')
+      assert.ok(sanitised.email, 'non-internal fields should be preserved')
+    })
+  })
+
   describe('Route configuration', () => {
     it('should have type set to local', () => {
       assert.equal(authLocal.type, 'local')
