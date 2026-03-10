@@ -4,12 +4,14 @@ import { getApp, getModule, cleanDb } from '../lib/app.js'
 
 let users
 let authLocal
+let mongodb
 
 describe('Users module', () => {
   before(async () => {
     await getApp()
     users = await getModule('users')
     authLocal = await getModule('auth-local')
+    mongodb = await getModule('mongodb')
   })
 
   after(async () => {
@@ -87,6 +89,36 @@ describe('Users module', () => {
       await users.update({ _id: user._id }, { firstName: 'Updated' })
       const [updated] = await users.find({ _id: user._id })
       assert.equal(updated.firstName, 'Updated', 'firstName should be updated')
+    })
+  })
+
+  describe('Sensitive data exclusion', () => {
+    it('should not include password in users.find() results', async () => {
+      const results = await users.find({ email: 'create-test@example.com' })
+      assert.equal(results.length, 1, 'should find the user')
+      assert.equal(results[0].password, undefined, 'password should not be present in find() results')
+    })
+
+    it('should not include password in users.findOne() results', async () => {
+      const user = await users.findOne({ email: 'create-test@example.com' })
+      assert.equal(user.password, undefined, 'password should not be present in findOne() results')
+    })
+
+    it('should still have password stored in the raw database record', async () => {
+      const [dbUser] = await mongodb.find('users', { email: 'create-test@example.com' })
+      assert.ok(dbUser.password, 'password should exist in raw DB record')
+      assert.ok(dbUser.password.startsWith('$2'), 'password should be a bcrypt hash in DB')
+    })
+
+    it('should not include password in register() return value', async () => {
+      const user = await authLocal.register({
+        email: 'sensitive-test@example.com',
+        firstName: 'Sensitive',
+        lastName: 'Test',
+        password: 'Password123!'
+      })
+      assert.ok(user._id, 'user should be created')
+      assert.equal(user.password, undefined, 'password should not be in register() response')
     })
   })
 

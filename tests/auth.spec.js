@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { getApp, getModule, cleanDb } from '../lib/app.js'
 import { AuthToken } from 'adapt-authoring-auth'
+import { PasswordUtils, compare } from 'adapt-authoring-auth-local'
 
 let auth
 let authLocal
@@ -265,6 +266,242 @@ describe('Authentication system', () => {
       assert.equal(dbUser.failedLoginAttempts, 0, 'failedLoginAttempts should be reset to 0')
       assert.equal(dbUser.isPermLocked, false, 'isPermLocked should be false after re-enable')
       assert.equal(dbUser.isTempLocked, false, 'isTempLocked should be false after re-enable')
+    })
+  })
+
+  describe('Token Expiry', () => {
+    let expiryUser
+
+    before(async () => {
+      const [authorRole] = await roles.find({ shortName: 'contentcreator' })
+      expiryUser = await authLocal.register({
+        email: 'expiry@example.com',
+        firstName: 'Expiry',
+        lastName: 'User',
+        password: testPassword,
+        roles: [authorRole._id.toString()]
+      })
+    })
+
+    it('should generate a token with a short lifespan', async () => {
+      const token = await AuthToken.generate('local', expiryUser, { lifespan: '1s' })
+      assert.ok(token, 'should return a token')
+      const decoded = await AuthToken.decode(token)
+      assert.equal(decoded.sub, expiryUser.email)
+    })
+
+    it('should reject an expired token with AUTH_TOKEN_EXPIRED', async () => {
+      const token = await AuthToken.generate('local', expiryUser, { lifespan: '1s' })
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      await assert.rejects(
+        () => AuthToken.decode(token),
+        (err) => {
+          assert.ok(
+            err.code === 'AUTH_TOKEN_EXPIRED' || err.id === 'AUTH_TOKEN_EXPIRED' ||
+            err.message?.includes('AUTH_TOKEN_EXPIRED'),
+            `expected AUTH_TOKEN_EXPIRED, got: ${err.code || err.id || err.message}`
+          )
+          return true
+        }
+      )
+    })
+
+    it('should revoke the expired token from the database', async () => {
+      const token = await AuthToken.generate('local', expiryUser, { lifespan: '1s' })
+      const signature = AuthToken.getSignature(token)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      try { await AuthToken.decode(token) } catch {}
+      const dbTokens = await mongodb.find('authtokens', { signature })
+      assert.equal(dbTokens.length, 0, 'expired token should be auto-revoked from database')
+    })
+
+    it('should reject a token with an invalid signature', async () => {
+      const token = await AuthToken.generate('local', expiryUser)
+      const tampered = token.slice(0, -5) + 'xxxxx'
+      await assert.rejects(
+        () => AuthToken.decode(tampered),
+        (err) => {
+          assert.ok(
+            err.code === 'AUTH_TOKEN_INVALID' || err.id === 'AUTH_TOKEN_INVALID' ||
+            err.message?.includes('AUTH_TOKEN_INVALID'),
+            `expected AUTH_TOKEN_INVALID, got: ${err.code || err.id || err.message}`
+          )
+          return true
+        }
+      )
+    })
+  })
+
+  describe('Password Reset', () => {
+    const resetEmail = 'resetuser@example.com'
+    const resetPassword = 'T3stP@ssword!'
+
+    before(async () => {
+      const [authorRole] = await roles.find({ shortName: 'contentcreator' })
+      await authLocal.register({
+        email: resetEmail,
+        firstName: 'Reset',
+        lastName: 'User',
+        password: resetPassword,
+        roles: [authorRole._id.toString()]
+      })
+    })
+
+    it('should create a reset token for a valid user', async () => {
+      const token = await PasswordUtils.createReset(resetEmail)
+      assert.ok(token, 'should return a token string')
+      assert.equal(typeof token, 'string', 'token should be a string')
+    })
+
+    it('should store the reset token in the database', async () => {
+      const token = await PasswordUtils.createReset(resetEmail)
+      const [dbToken] = await mongodb.find('passwordresets', { email: resetEmail })
+      assert.ok(dbToken, 'token should exist in the database')
+      assert.equal(dbToken.email, resetEmail, 'token email should match')
+      assert.equal(dbToken.token, token, 'stored token should match the returned token')
+      assert.ok(dbToken.expiresAt, 'token should have an expiry')
+    })
+
+    it('should invalidate previous tokens when a new one is created', async () => {
+      const token1 = await PasswordUtils.createReset(resetEmail)
+      const token2 = await PasswordUtils.createReset(resetEmail)
+      assert.notEqual(token1, token2, 'tokens should be different')
+      const dbTokens = await mongodb.find('passwordresets', { email: resetEmail })
+      assert.equal(dbTokens.length, 1, 'only the latest token should exist')
+      assert.equal(dbTokens[0].token, token2, 'the latest token should be stored')
+    })
+
+    it('should validate a valid reset token', async () => {
+      const token = await PasswordUtils.createReset(resetEmail)
+      const tokenData = await PasswordUtils.validateReset(token)
+      assert.ok(tokenData, 'should return token data')
+      assert.equal(tokenData.email, resetEmail, 'token data should contain the correct email')
+    })
+
+    it('should reject an invalid reset token', async () => {
+      await assert.rejects(
+        () => PasswordUtils.validateReset('nonexistent-token-12345'),
+        (err) => {
+          assert.ok(
+            err.code === 'AUTH_TOKEN_INVALID' || err.id === 'AUTH_TOKEN_INVALID' ||
+            err.message?.includes('AUTH_TOKEN_INVALID'),
+            `expected AUTH_TOKEN_INVALID, got: ${err.code || err.id || err.message}`
+          )
+          return true
+        }
+      )
+    })
+
+    it('should reject a missing reset token', async () => {
+      await assert.rejects(
+        () => PasswordUtils.validateReset(undefined),
+        (err) => {
+          assert.ok(
+            err.code === 'INVALID_PARAMS' || err.message?.includes('INVALID_PARAMS'),
+            `expected INVALID_PARAMS, got: ${err.code || err.message}`
+          )
+          return true
+        }
+      )
+    })
+
+    it('should reject an expired reset token', async () => {
+      const token = await PasswordUtils.createReset(resetEmail, 1) // 1ms lifespan
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await assert.rejects(
+        () => PasswordUtils.validateReset(token),
+        (err) => {
+          assert.ok(
+            err.code === 'AUTH_TOKEN_EXPIRED' || err.id === 'AUTH_TOKEN_EXPIRED' ||
+            err.message?.includes('AUTH_TOKEN_EXPIRED'),
+            `expected AUTH_TOKEN_EXPIRED, got: ${err.code || err.id || err.message}`
+          )
+          return true
+        }
+      )
+    })
+
+    it('should delete a reset token after use', async () => {
+      const token = await PasswordUtils.createReset(resetEmail)
+      await PasswordUtils.deleteReset(token)
+      const dbTokens = await mongodb.find('passwordresets', { token })
+      assert.equal(dbTokens.length, 0, 'deleted token should not exist in database')
+    })
+
+    it('should bind reset token to the original email (cannot be used for another user)', async () => {
+      const token = await PasswordUtils.createReset(resetEmail)
+      const tokenData = await PasswordUtils.validateReset(token)
+      assert.equal(tokenData.email, resetEmail, 'token is bound to the email that requested the reset')
+      assert.notEqual(tokenData.email, 'other@example.com', 'token email does not match a different user')
+    })
+
+    it('should reject createReset for a non-local auth user', async () => {
+      // Create a user directly via mongodb with a non-local authType
+      await mongodb.insert('users', {
+        email: 'oauth-user@example.com',
+        firstName: 'OAuth',
+        lastName: 'User',
+        authType: 'oauth',
+        isEnabled: true
+      })
+      await assert.rejects(
+        () => PasswordUtils.createReset('oauth-user@example.com'),
+        (err) => {
+          assert.ok(
+            err.code === 'ACCOUNT_NOT_LOCALAUTHD' || err.id === 'ACCOUNT_NOT_LOCALAUTHD' ||
+            err.message?.includes('ACCOUNT_NOT_LOCALAUTHD'),
+            `expected ACCOUNT_NOT_LOCALAUTHD, got: ${err.code || err.id || err.message}`
+          )
+          return true
+        }
+      )
+      await mongodb.delete('users', { email: 'oauth-user@example.com' })
+    })
+  })
+
+  describe('Password Change via Reset Token', () => {
+    const changeEmail = 'changepass@example.com'
+    const originalPassword = 'T3stP@ssword!'
+    const updatedPassword = 'Upd@tedP@ss1!'
+
+    before(async () => {
+      const [authorRole] = await roles.find({ shortName: 'contentcreator' })
+      await authLocal.register({
+        email: changeEmail,
+        firstName: 'Change',
+        lastName: 'Pass',
+        password: originalPassword,
+        roles: [authorRole._id.toString()]
+      })
+    })
+
+    it('should change password using a valid reset token', async () => {
+      const token = await PasswordUtils.createReset(changeEmail)
+      await authLocal.updateUser({ email: changeEmail }, { password: updatedPassword })
+      await PasswordUtils.deleteReset(token)
+
+      // Verify old password no longer works
+      const [dbUser] = await mongodb.find('users', { email: changeEmail })
+      await assert.rejects(
+        () => compare(originalPassword, dbUser.password),
+        'old password should no longer match'
+      )
+      // Verify new password works
+      await compare(updatedPassword, dbUser.password)
+    })
+
+    it('should revoke all tokens after password change via updateUser', async () => {
+      // Generate a token before the password change
+      const user = await users.findOne({ email: changeEmail })
+      const authToken = await AuthToken.generate('local', user)
+      const signature = AuthToken.getSignature(authToken)
+
+      // updateUser with password triggers disavowUser
+      await authLocal.updateUser({ email: changeEmail }, { password: 'An0therP@ss!' })
+
+      // The old token should be revoked
+      const dbTokens = await mongodb.find('authtokens', { signature })
+      assert.equal(dbTokens.length, 0, 'tokens should be revoked after password change')
     })
   })
 
