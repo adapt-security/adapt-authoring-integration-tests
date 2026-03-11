@@ -400,7 +400,7 @@ describe('Content CRUD operations', () => {
       const items = await content.find(
         { _courseId: courseId },
         { validate: false },
-        { projection: { _id: 1, _parentId: 1, _courseId: 1, _type: 1, _sortOrder: 1, title: 1, displayTitle: 1, _component: 1, _layout: 1, updatedAt: 1 } }
+        { projection: { _id: 1, _parentId: 1, _courseId: 1, _type: 1, _sortOrder: 1, title: 1, displayTitle: 1, _component: 1, _layout: 1, _menu: 1, _theme: 1, _enabledPlugins: 1, updatedAt: 1 } }
       )
       const tree = new ContentTree(items)
       return items.map(item => ({
