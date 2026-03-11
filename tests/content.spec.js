@@ -307,5 +307,257 @@ describe('Content CRUD operations', () => {
         assert.equal(articles[i]._sortOrder, i + 1, `article ${i} should have _sortOrder ${i + 1}`)
       }
     })
+
+    it('should recalculate sort order after deleting a sibling', async () => {
+      const { page, courseId } = await createCourseHierarchy()
+      const pageId = page._id.toString()
+
+      const a1 = await content.insert(
+        { _type: 'article', title: 'A1', _parentId: pageId, _courseId: courseId, createdBy },
+        { validate: false, schemaName: 'article' }
+      )
+      await content.insert(
+        { _type: 'article', title: 'A2', _parentId: pageId, _courseId: courseId, createdBy },
+        { validate: false, schemaName: 'article' }
+      )
+
+      // Delete the first extra article (there's also the one from createCourseHierarchy)
+      await content.delete({ _id: a1._id })
+
+      const remaining = await content.find(
+        { _parentId: pageId, _type: 'article' },
+        {},
+        { sort: { _sortOrder: 1 } }
+      )
+      for (let i = 0; i < remaining.length; i++) {
+        assert.equal(remaining[i]._sortOrder, i + 1, `remaining article ${i} should have _sortOrder ${i + 1}`)
+      }
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Delete return value
+  // ---------------------------------------------------------------------------
+  describe('Delete return value', () => {
+    it('should return array of target and all deleted descendants', async () => {
+      const { page, article, block } = await createCourseHierarchy()
+
+      const result = await content.delete({ _id: page._id })
+
+      assert.ok(Array.isArray(result), 'delete should return an array')
+      assert.ok(result.length >= 3, 'should include page + article + block')
+      const ids = result.map(r => r._id.toString())
+      assert.ok(ids.includes(page._id.toString()), 'should include the target')
+      assert.ok(ids.includes(article._id.toString()), 'should include article descendant')
+      assert.ok(ids.includes(block._id.toString()), 'should include block descendant')
+    })
+
+    it('should return target as first element', async () => {
+      const { page } = await createCourseHierarchy()
+
+      const result = await content.delete({ _id: page._id })
+
+      assert.equal(result[0]._id.toString(), page._id.toString(), 'first element should be the target')
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // getSchema
+  // ---------------------------------------------------------------------------
+  describe('getSchema', () => {
+    it('should resolve schema for a known content type', async () => {
+      const schema = await content.getSchema('content', { _type: 'article' })
+      assert.ok(schema, 'should return a schema')
+    })
+
+    it('should resolve schema for page as contentobject', async () => {
+      const schema = await content.getSchema('content', { _type: 'page' })
+      assert.ok(schema, 'should return a schema')
+    })
+
+    it('should cache schemas across calls', async () => {
+      content._schemaCache.clear()
+      await content.getSchema('content', { _type: 'article' })
+      assert.ok(content._schemaCache.size > 0, 'cache should have entries after first call')
+      const cacheSize = content._schemaCache.size
+      await content.getSchema('content', { _type: 'article' })
+      assert.equal(content._schemaCache.size, cacheSize, 'cache size should not grow on repeat call')
+    })
+
+    it('should resolve _courseId from DB when not provided', async () => {
+      const { article } = await createCourseHierarchy()
+      const schema = await content.getSchema('content', { _id: article._id })
+      assert.ok(schema, 'should return a schema even when _courseId is not provided')
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Tree endpoint (handleTree)
+  // ---------------------------------------------------------------------------
+  describe('Tree endpoint', () => {
+    async function getTree (courseId) {
+      const ContentTree = (await import('../../content/lib/ContentTree.js')).default
+      const items = await content.find(
+        { _courseId: courseId },
+        { validate: false },
+        { projection: { _id: 1, _parentId: 1, _courseId: 1, _type: 1, _sortOrder: 1, title: 1, displayTitle: 1, _component: 1, _layout: 1, updatedAt: 1 } }
+      )
+      const tree = new ContentTree(items)
+      return items.map(item => ({
+        ...item,
+        _children: tree.getChildren(item._id).map(c => c._id)
+      }))
+    }
+
+    it('should return projected items for a course', async () => {
+      const { courseId } = await createCourseHierarchy()
+      const items = await getTree(courseId)
+      assert.ok(items.length >= 5, 'should return course + config + page + article + block')
+      const types = items.map(i => i._type)
+      assert.ok(types.includes('course'))
+      assert.ok(types.includes('config'))
+      assert.ok(types.includes('page'))
+      assert.ok(types.includes('article'))
+      assert.ok(types.includes('block'))
+    })
+
+    it('should only include projected fields plus _children', async () => {
+      const { courseId } = await createCourseHierarchy()
+      const items = await getTree(courseId)
+      for (const item of items) {
+        assert.ok(item._id, 'should have _id')
+        assert.ok(item._type, 'should have _type')
+        assert.ok(Array.isArray(item._children), 'should have _children array')
+        assert.equal(item.body, undefined, 'should not have body')
+        assert.equal(item.createdBy, undefined, 'should not have createdBy')
+      }
+    })
+
+    it('should include _children IDs for parent items', async () => {
+      const { course, page, article, courseId } = await createCourseHierarchy()
+      const items = await getTree(courseId)
+      const courseItem = items.find(i => i._id.toString() === course._id.toString())
+      assert.ok(courseItem._children.length >= 1, 'course should have children')
+      assert.ok(
+        courseItem._children.some(id => id.toString() === page._id.toString()),
+        'course _children should include page'
+      )
+      const pageItem = items.find(i => i._id.toString() === page._id.toString())
+      assert.ok(
+        pageItem._children.some(id => id.toString() === article._id.toString()),
+        'page _children should include article'
+      )
+    })
+
+    it('should have empty _children for leaf items', async () => {
+      const { block, courseId } = await createCourseHierarchy()
+      const items = await getTree(courseId)
+      const blockItem = items.find(i => i._id.toString() === block._id.toString())
+      assert.deepEqual(blockItem._children, [], 'block should have no children')
+    })
+
+    it('should include updatedAt on all items', async () => {
+      const { courseId } = await createCourseHierarchy()
+      const items = await getTree(courseId)
+      for (const item of items) {
+        assert.ok(item.updatedAt, `${item._type} should have updatedAt`)
+      }
+    })
+
+    it('should provide course updatedAt for conditional request support', async () => {
+      const { course, article } = await createCourseHierarchy()
+
+      const courseBefore = await content.findOne(
+        { _type: 'course', _courseId: course._id },
+        { validate: false },
+        { projection: { updatedAt: 1 } }
+      )
+      const lastModified = new Date(courseBefore.updatedAt)
+
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      await content.update(
+        { _id: article._id },
+        { title: 'Tree staleness test' },
+        { validate: false }
+      )
+
+      const courseAfter = await content.findOne(
+        { _type: 'course', _courseId: course._id },
+        { validate: false },
+        { projection: { updatedAt: 1 } }
+      )
+      const newLastModified = new Date(courseAfter.updatedAt)
+      assert.ok(newLastModified > lastModified, 'course updatedAt should advance after child edit')
+    })
+
+    it('should return empty array for non-existent course', async () => {
+      const items = await getTree('aaaabbbbccccddddeeee0000')
+      assert.equal(items.length, 0)
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Course timestamp propagation
+  // ---------------------------------------------------------------------------
+  describe('Course timestamp', () => {
+    it('should update course updatedAt when a child item is modified', async () => {
+      const { course, article } = await createCourseHierarchy()
+
+      const courseBefore = await content.findOne({ _id: course._id })
+      const beforeTimestamp = courseBefore.updatedAt
+
+      // Small delay to ensure timestamp differs
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      await content.update(
+        { _id: article._id },
+        { title: 'Modified Article' },
+        { validate: false }
+      )
+
+      const courseAfter = await content.findOne({ _id: course._id })
+      assert.ok(
+        new Date(courseAfter.updatedAt) > new Date(beforeTimestamp),
+        'course updatedAt should be newer after child update'
+      )
+    })
+
+    it('should update course updatedAt when a child item is deleted', async () => {
+      const { course, block } = await createCourseHierarchy()
+
+      const courseBefore = await content.findOne({ _id: course._id })
+      const beforeTimestamp = courseBefore.updatedAt
+
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      await content.delete({ _id: block._id })
+
+      const courseAfter = await content.findOne({ _id: course._id })
+      assert.ok(
+        new Date(courseAfter.updatedAt) > new Date(beforeTimestamp),
+        'course updatedAt should be newer after child delete'
+      )
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Clone edge cases
+  // ---------------------------------------------------------------------------
+  describe('Clone edge cases', () => {
+    it('should reject clone with non-existent _id', async () => {
+      await assert.rejects(
+        () => content.clone(createdBy, 'aaaabbbbccccddddeeee0000'),
+        (err) => err.code !== undefined
+      )
+    })
+
+    it('should reject clone with invalid parent', async () => {
+      const { block } = await createCourseHierarchy()
+      await assert.rejects(
+        () => content.clone(createdBy, block._id, 'aaaabbbbccccddddeeee0000'),
+        (err) => err.code !== undefined
+      )
+    })
   })
 })
