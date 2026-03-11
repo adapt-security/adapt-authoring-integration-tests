@@ -4,7 +4,6 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import { getApp, getModule, cleanDb } from '../lib/app.js'
-import { getFixture } from '../lib/fixtures.js'
 
 let framework
 let tmpRoot
