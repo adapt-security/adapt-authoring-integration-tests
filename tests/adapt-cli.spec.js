@@ -27,7 +27,7 @@ describe('adapt-cli', () => {
 
     it('should include name and version info on each plugin', () => {
       for (const p of plugins) {
-        assert.ok(p.name, `plugin should have a name`)
+        assert.ok(p.name, 'plugin should have a name')
         assert.ok(typeof p.matchedVersion === 'string', `${p.name} should have a matchedVersion`)
       }
     })
@@ -91,12 +91,10 @@ describe('adapt-cli', () => {
   // installPlugins / uninstallPlugins round-trip
   // ---------------------------------------------------------------------------
   describe('installPlugins() and uninstallPlugins()', () => {
-    let installedBefore
     let targetPlugin
 
     before(async () => {
       const all = await framework.runCliCommand('getPluginUpdateInfos')
-      installedBefore = all.map(p => p.name)
       // Pick a plugin that's already installed so we can uninstall and reinstall it
       targetPlugin = all.find(p => p.matchedVersion && !p.isLocalSource)
       assert.ok(targetPlugin, 'should have at least one non-local plugin to test with')

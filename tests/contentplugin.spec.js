@@ -5,7 +5,6 @@ import { getApp, getModule, cleanDb } from '../lib/app.js'
 let contentplugin
 let content
 let framework
-let jsonschema
 let authLocal
 let createdBy
 
@@ -15,7 +14,6 @@ describe('ContentPlugin module', () => {
     contentplugin = await getModule('contentplugin')
     content = await getModule('content')
     framework = await getModule('adaptframework')
-    jsonschema = await getModule('jsonschema')
     authLocal = await getModule('auth-local')
     const user = await authLocal.register({
       email: 'contentplugin-test@example.com',
@@ -42,7 +40,7 @@ describe('ContentPlugin module', () => {
     it('should have name, version, and type on each plugin', async () => {
       const plugins = await contentplugin.find()
       for (const p of plugins) {
-        assert.ok(p.name, `plugin should have a name`)
+        assert.ok(p.name, 'plugin should have a name')
         assert.ok(p.version, `${p.name} should have a version`)
         assert.ok(p.type, `${p.name} should have a type`)
       }
@@ -144,7 +142,6 @@ describe('ContentPlugin module', () => {
   // ---------------------------------------------------------------------------
   describe('getPluginUses()', () => {
     let pluginId
-    let courseHierarchy
 
     before(async () => {
       const plugins = await contentplugin.find()
@@ -153,16 +150,14 @@ describe('ContentPlugin module', () => {
 
       // Create a course with the plugin enabled
       const v = false
-      const cid = (id) => id.toString()
       const course = await content.insert(
         { _type: 'course', title: 'Uses Test Course', createdBy },
         { validate: v, schemaName: 'course' }
       )
-      const courseId = cid(course._id)
       await content.insert(
         {
           _type: 'config',
-          _courseId: courseId,
+          _courseId: course._id.toString(),
           createdBy,
           _enabledPlugins: [testPlugin.name],
           _menu: '',
@@ -170,7 +165,6 @@ describe('ContentPlugin module', () => {
         },
         { validate: v, schemaName: 'config' }
       )
-      courseHierarchy = { course, courseId }
     })
 
     it('should return courses using the plugin', async () => {
