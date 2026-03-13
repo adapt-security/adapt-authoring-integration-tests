@@ -15,6 +15,9 @@ describe('ContentPlugin module', () => {
     content = await getModule('content')
     framework = await getModule('adaptframework')
     authLocal = await getModule('auth-local')
+    // Earlier test suites call cleanDb() which wipes the contentplugins collection,
+    // so re-sync to repopulate it
+    await contentplugin.syncPluginData()
     const user = await authLocal.register({
       email: 'contentplugin-test@example.com',
       firstName: 'Plugin',
@@ -82,8 +85,10 @@ describe('ContentPlugin module', () => {
         name: testPluginName,
         displayName: 'Test Plugin',
         version: '1.0.0',
+        framework: '>=5.0.0',
         type: 'extension',
-        targetAttribute: '_test'
+        targetAttribute: '_test',
+        isLocalInstall: false
       })
       assert.ok(result._id, 'should return a document with _id')
       assert.equal(result.name, testPluginName)
@@ -95,8 +100,10 @@ describe('ContentPlugin module', () => {
         name: testPluginName,
         displayName: 'Test Plugin Updated',
         version: '2.0.0',
+        framework: '>=5.0.0',
         type: 'extension',
-        targetAttribute: '_test'
+        targetAttribute: '_test',
+        isLocalInstall: false
       })
       assert.equal(result.version, '2.0.0')
 
@@ -180,8 +187,10 @@ describe('ContentPlugin module', () => {
         name: '__unused-test-plugin',
         displayName: 'Unused',
         version: '1.0.0',
+        framework: '>=5.0.0',
         type: 'extension',
-        targetAttribute: '_unused'
+        targetAttribute: '_unused',
+        isLocalInstall: false
       })
       const uses = await contentplugin.getPluginUses(dummy._id.toString())
       assert.deepEqual(uses, [])
@@ -223,8 +232,10 @@ describe('ContentPlugin module', () => {
           name: targetPlugin.name,
           displayName: targetPlugin.displayName,
           version: targetPlugin.version,
+          framework: targetPlugin.framework,
           type: targetPlugin.type,
-          targetAttribute: targetPlugin.targetAttribute
+          targetAttribute: targetPlugin.targetAttribute,
+          isLocalInstall: targetPlugin.isLocalInstall
         })
         // Re-process schemas
         const [pluginInfo] = await framework.runCliCommand('getPluginUpdateInfos', {
