@@ -164,6 +164,25 @@ describe('AdaptFramework import', () => {
     })
   })
 
+  describe('Import without migration', () => {
+    it('should import content when migrateContent is false', async () => {
+      const importer = await framework.importCourse({
+        importPath: await getFixture('course-export'),
+        userId: '000000000000000000000000',
+        tags: [],
+        importContent: true,
+        importPlugins: true,
+        migrateContent: false,
+        updatePlugins: false,
+        removeSource: false
+      })
+      const summary = importer.summary
+      assert.ok(summary.courseId, 'should have created a course')
+      assert.equal(summary.content.course, 1, 'should count 1 course')
+      assert.equal(summary.content.component, 23, 'should count 23 components')
+    })
+  })
+
   describe('Dry run import', () => {
     let courseCountBefore
 
