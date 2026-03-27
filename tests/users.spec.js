@@ -16,6 +16,32 @@ describe('Users module', () => {
     await cleanDb(['users', 'authtokens', 'passwordresets'])
   })
 
+  describe('/me route guard', () => {
+    it('should throw when auth user is missing on /me route', async () => {
+      const req = {
+        method: 'GET',
+        params: {},
+        apiData: {
+          config: { route: '/me' },
+          query: {},
+          data: {}
+        },
+        auth: {}
+      }
+      await assert.rejects(
+        () => users.onRequest(req),
+        (err) => {
+          assert.ok(
+            err.code === 'UNAUTHORIZED' || err.id === 'UNAUTHORIZED' ||
+            err.message?.includes('UNAUTHORIZED'),
+            `expected UNAUTHORIZED error, got: ${err.code || err.id || err.message}`
+          )
+          return true
+        }
+      )
+    })
+  })
+
   describe('User creation', () => {
     it('should create a user via authLocal.register()', async () => {
       const user = await authLocal.register({
