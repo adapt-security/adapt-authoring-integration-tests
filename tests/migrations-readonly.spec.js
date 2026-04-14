@@ -94,7 +94,6 @@ describe('Config migration readOnlyConfig', () => {
     })
 
     it('should not modify the config file', async () => {
-      const raw = await fs.readFile(scaffold.configFilePath, 'utf8')
       const config = (await import(pathToFileURL(scaffold.configFilePath).href + `?t=${Date.now()}`)).default
       assert.equal(config['test-module'].oldKey, 'value', 'oldKey should still be present')
       assert.equal(config['test-module'].newKey, undefined, 'newKey should not exist')
