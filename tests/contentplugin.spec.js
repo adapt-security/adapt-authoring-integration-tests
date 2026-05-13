@@ -170,24 +170,12 @@ describe('ContentPlugin module', () => {
           _menu: '',
           _theme: ''
         },
-        { validate: v, schemaName: 'config' }
+        { validate: v, schemaName: 'config', updateEnabledPlugins: false }
       )
     })
 
     it('should return courses using the plugin', async () => {
-      // DEBUG
-      const mongodb = await getModule('mongodb')
-      const configDocs = await mongodb.find('content', { _type: 'config', title: { $exists: false } })
-      const courseDocs = await mongodb.find('content', { _type: 'course', title: 'Uses Test Course' })
-      const usersDocs = await mongodb.find('users', {})
-      const [{ name: pluginName }] = await contentplugin.find({ _id: pluginId })
-      console.log('[DEBUG] pluginId=', pluginId, 'pluginName=', pluginName)
-      console.log('[DEBUG] configs in db:', configDocs.length, configDocs.map(c => ({ _id: c._id, _courseId: c._courseId, _courseIdType: typeof c._courseId, _enabledPlugins: c._enabledPlugins, createdBy: c.createdBy, createdByType: typeof c.createdBy })))
-      console.log('[DEBUG] courses with title:', courseDocs.length, courseDocs.map(c => ({ _id: c._id, _idType: typeof c._id, createdBy: c.createdBy, createdByType: typeof c.createdBy })))
-      console.log('[DEBUG] users in db:', usersDocs.length, usersDocs.map(u => ({ _id: u._id, email: u.email })))
-
       const uses = await contentplugin.getPluginUses(pluginId)
-      console.log('[DEBUG] getPluginUses result:', uses)
       assert.ok(Array.isArray(uses), 'should return an array')
       assert.ok(uses.length > 0, 'should find at least one course')
       assert.equal(uses[0].title, 'Uses Test Course')
@@ -279,7 +267,7 @@ describe('ContentPlugin module', () => {
           _menu: '',
           _theme: ''
         },
-        { validate: v, schemaName: 'config' }
+        { validate: v, schemaName: 'config', updateEnabledPlugins: false }
       )
 
       await assert.rejects(
