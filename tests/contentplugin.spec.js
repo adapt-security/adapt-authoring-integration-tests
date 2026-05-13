@@ -24,7 +24,7 @@ describe('ContentPlugin module', () => {
       lastName: 'Tester',
       password: 'Password123!'
     })
-    createdBy = user._id.toString()
+    createdBy = user._id
   })
 
   after(async () => {
@@ -55,7 +55,7 @@ describe('ContentPlugin module', () => {
   // ---------------------------------------------------------------------------
   describe('find() with includeUpdateInfo', () => {
     it('should include update info when requested', async () => {
-      const plugins = await contentplugin.find({ includeUpdateInfo: true })
+      const plugins = await contentplugin.find({}, { includeUpdateInfo: true })
       assert.ok(plugins.length > 0, 'should return plugins')
       for (const p of plugins) {
         assert.equal(typeof p.canBeUpdated, 'boolean', `${p.name} should have canBeUpdated`)
@@ -124,7 +124,7 @@ describe('ContentPlugin module', () => {
 
     it('should return true for a known plugin schema via isPluginSchema()', () => {
       const firstPlugin = Object.keys(contentplugin.pluginSchemas)[0]
-      const firstSchema = contentplugin.pluginSchemas[firstPlugin][0]
+      const firstSchema = contentplugin.getPluginSchemas(firstPlugin)[0]
       assert.equal(contentplugin.isPluginSchema(firstSchema), true)
     })
 
@@ -164,7 +164,7 @@ describe('ContentPlugin module', () => {
       await content.insert(
         {
           _type: 'config',
-          _courseId: course._id.toString(),
+          _courseId: course._id,
           createdBy,
           _enabledPlugins: [testPlugin.name],
           _menu: '',
@@ -261,7 +261,7 @@ describe('ContentPlugin module', () => {
       await content.insert(
         {
           _type: 'config',
-          _courseId: course._id.toString(),
+          _courseId: course._id,
           createdBy,
           _enabledPlugins: [usedPlugin.name],
           _menu: '',

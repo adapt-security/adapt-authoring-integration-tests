@@ -396,7 +396,7 @@ describe('Content CRUD operations', () => {
   // ---------------------------------------------------------------------------
   describe('Tree endpoint', () => {
     async function getTree (courseId) {
-      const ContentTree = (await import('../../content/lib/ContentTree.js')).default
+      const ContentTree = (await import('../../adapt-authoring-content/lib/ContentTree.js')).default
       const items = await content.find(
         { _courseId: courseId },
         { validate: false },

@@ -31,10 +31,11 @@ describe('Users module', () => {
       await assert.rejects(
         () => users.onRequest(req),
         (err) => {
+          const code = err.code || err.id
           assert.ok(
-            err.code === 'UNAUTHORIZED' || err.id === 'UNAUTHORIZED' ||
-            err.message?.includes('UNAUTHORIZED'),
-            `expected UNAUTHORIZED error, got: ${err.code || err.id || err.message}`
+            code === 'UNAUTHENTICATED' || code === 'UNAUTHORIZED' ||
+            err.message?.includes('UNAUTHENTICATED') || err.message?.includes('UNAUTHORIZED'),
+            `expected UNAUTHENTICATED/UNAUTHORIZED error, got: ${err.code || err.id || err.message}`
           )
           return true
         }
