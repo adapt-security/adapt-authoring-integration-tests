@@ -65,9 +65,7 @@ describe('Config migration readOnlyConfig', () => {
   before(async () => {
     await getApp()
     mongodb = await getModule('mongodb')
-    const configPath = path.resolve('conf', `${process.env.NODE_ENV || 'testing'}.config.js`)
-    const appConfig = (await import(pathToFileURL(configPath).href)).default
-    connectionUri = appConfig['adapt-authoring-mongodb']?.connectionUri
+    connectionUri = mongodb.getConfig('connectionUri')
   })
 
   after(async () => {
