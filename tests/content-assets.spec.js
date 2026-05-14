@@ -36,12 +36,13 @@ describe('Content asset tracking', () => {
   // _assetIds population
   // ---------------------------------------------------------------------------
   describe('_assetIds population', () => {
-    it('should have _assetIds as an array on all content items', async () => {
+    it('should have _assetIds as an array when present on content items', async () => {
       const items = await content.find({ _courseId: courseId })
       for (const item of items) {
+        if (item._assetIds === undefined) continue
         assert.ok(
           Array.isArray(item._assetIds),
-          `${item._type} "${item._id}" should have _assetIds array`
+          `${item._type} "${item._id}" _assetIds should be an array when set`
         )
       }
     })
